@@ -1,0 +1,8 @@
+{
+  "name": "Smart Ginni",
+  "description": "Track kitchen inventory via voice commands, manage automated shopping lists, and receive low-stock alerts in Bengali.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
