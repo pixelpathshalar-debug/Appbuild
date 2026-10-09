@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.local.ActivityLogEntity
 import com.example.data.local.AdminCredentialsEntity
 import com.example.data.local.AppDatabase
+import com.example.data.local.MarketGuideEntity
 import com.example.data.local.PantryItemEntity
 import com.example.data.local.ScannedImageEntity
 import com.example.data.local.ShariKeyEntity
@@ -33,6 +34,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val pantryDao = db.pantryDao()
     private val toBuyDao = db.toBuyDao()
     private val userDao = db.userDao()
+    private val marketGuideDao = db.marketGuideDao()
 
     // Language state
     private val _currentLanguage = MutableStateFlow(AppLanguage.BENGALI)
@@ -73,6 +75,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val scannedImages: StateFlow<List<ScannedImageEntity>> = userDao.getAllScannedImages()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Bazaar Directory / Market Guide Items
+    val marketGuideItems: StateFlow<List<MarketGuideEntity>> = marketGuideDao.getAllMarketItems()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Sync status
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
@@ -91,18 +97,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         NotificationHelper.createNotificationChannel(application)
 
+        // Seed market guide items if empty
+        viewModelScope.launch {
+            if (marketGuideDao.count() == 0) {
+                marketGuideDao.insertItems(AppDatabase.starterMarketGuideItems)
+            }
+        }
+
         // Load demo user or prompt login
         viewModelScope.launch {
-            val user = userDao.findByIdentifier("+8801712345678") ?: userDao.getUserById("user_01")
+            val user = userDao.findByIdentifier("+919876543210") ?: userDao.getUserById("user_01")
             _currentUser.value = user ?: UserEntity(
                 id = "user_01",
-                name = "Tariqul Islam",
-                identifier = "+8801712345678",
+                name = "Suparna Kanti Datta",
+                identifier = "+919876543210",
                 role = "USER",
                 status = "ACTIVE",
-                companionIdentifier = "+8801798765432",
+                companionIdentifier = "+919876543211",
                 companionRole = "WIFE",
-                currencySymbol = "৳",
+                currencySymbol = "₹",
                 preferredLanguage = "bn"
             )
         }
@@ -138,7 +151,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     status = "ACTIVE",
                     companionIdentifier = "9775708722",
                     companionRole = "HUSBAND",
-                    currencySymbol = "৳",
+                    currencySymbol = "₹",
                     preferredLanguage = _currentLanguage.value.code
                 )
             }
@@ -171,7 +184,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 status = "ACTIVE",
                 companionIdentifier = companionId?.takeIf { it.isNotBlank() },
                 companionRole = companionRole,
-                currencySymbol = _currentUser.value?.currencySymbol ?: "৳",
+                currencySymbol = _currentUser.value?.currencySymbol ?: "₹",
                 preferredLanguage = _currentLanguage.value.code
             )
             userDao.insertUser(newUser)
@@ -800,7 +813,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val user = _currentUser.value?.name ?: "Family Kitchen"
-        val currency = _currentUser.value?.currencySymbol ?: "৳"
+        val currency = _currentUser.value?.currencySymbol ?: "₹"
         val file = PdfGenerator.generateShoppingListPdf(context, items, user, currency)
         if (file != null) {
             _lastGeneratedPdf.value = file
@@ -980,5 +993,78 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun processVoiceCommand(spokenText: String) {
         executeVoiceCommand(spokenText)
+    }
+
+    // --- Bazaar Directory (Market Guide) CRUD Operations ---
+    fun addMarketGuideItem(
+        nameEn: String,
+        nameBn: String,
+        sectionEn: String,
+        sectionBn: String,
+        locationTipEn: String,
+        locationTipBn: String,
+        buyingTipEn: String,
+        buyingTipBn: String,
+        minPrice: Double,
+        maxPrice: Double,
+        priceUnit: String,
+        defaultUnit: String,
+        defaultQty: Double
+    ) {
+        viewModelScope.launch {
+            val newItem = MarketGuideEntity(
+                nameEn = nameEn.trim(),
+                nameBn = nameBn.ifBlank { nameEn }.trim(),
+                sectionEn = sectionEn,
+                sectionBn = sectionBn,
+                locationTipEn = locationTipEn.trim(),
+                locationTipBn = locationTipBn.trim(),
+                buyingTipEn = buyingTipEn.trim(),
+                buyingTipBn = buyingTipBn.trim(),
+                minPrice = minPrice,
+                maxPrice = maxPrice,
+                priceUnit = priceUnit,
+                defaultUnit = defaultUnit,
+                defaultQty = defaultQty,
+                isCustom = true
+            )
+            marketGuideDao.insertItem(newItem)
+            userDao.insertLog(
+                ActivityLogEntity(
+                    titleEn = "Added new bazaar directory item: $nameEn",
+                    titleBn = "বাজার ডিরেক্টরিতে নতুন পণ্য যুক্ত করা হয়েছে: $nameBn",
+                    type = "MARKET"
+                )
+            )
+            checkAndTriggerAutoSync()
+        }
+    }
+
+    fun updateMarketGuideItem(item: MarketGuideEntity) {
+        viewModelScope.launch {
+            marketGuideDao.updateItem(item)
+            userDao.insertLog(
+                ActivityLogEntity(
+                    titleEn = "Updated bazaar directory item: ${item.nameEn}",
+                    titleBn = "বাজার ডিরেক্টরি পণ্য হালনাগাদ করা হয়েছে: ${item.nameBn}",
+                    type = "MARKET"
+                )
+            )
+            checkAndTriggerAutoSync()
+        }
+    }
+
+    fun deleteMarketGuideItem(item: MarketGuideEntity) {
+        viewModelScope.launch {
+            marketGuideDao.deleteItem(item)
+            userDao.insertLog(
+                ActivityLogEntity(
+                    titleEn = "Deleted bazaar directory item: ${item.nameEn}",
+                    titleBn = "বাজার ডিরেক্টরি থেকে পণ্য মুছে ফেলা হয়েছে: ${item.nameBn}",
+                    type = "MARKET"
+                )
+            )
+            checkAndTriggerAutoSync()
+        }
     }
 }

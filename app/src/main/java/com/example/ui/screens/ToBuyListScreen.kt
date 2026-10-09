@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
@@ -65,11 +67,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -133,7 +138,7 @@ fun ToBuyListScreen(
         }
     }
 
-    val currency = currentUser?.currencySymbol ?: "৳"
+    val currency = currentUser?.currencySymbol ?: "₹"
 
     // Filter items based on category and search query
     val filteredToBuyItems = toBuyItems.filter { item ->
@@ -708,6 +713,7 @@ fun ToBuyListScreen(
     if (showCameraScanDialog) {
         CameraScanDialog(
             language = language,
+            currencySymbol = currency,
             onDismiss = { showCameraScanDialog = false },
             onItemsExtractedAndConfirmed = { items, savedFile ->
                 if (savedFile != null) {
@@ -781,15 +787,13 @@ fun ToBuyListScreen(
         )
     }
 
-    // Add To-Buy Item Dialog
+    // Add Item to Fordo Dialog (Adds already added items from Vault or Custom item)
     if (showAddDialog) {
-        AddToBuyCustomDialog(
+        AddToFordoDialog(
+            viewModel = viewModel,
             language = language,
             currencySymbol = currency,
-            onDismiss = { showAddDialog = false },
-            onConfirm = { nameEn, nameBn, cat, qty, unit, rate, price, notes, isPrivate ->
-                viewModel.addToBuyItem(nameEn, nameBn, cat, qty, unit, rate, price, notes, isPrivate)
-            }
+            onDismiss = { showAddDialog = false }
         )
     }
 
@@ -1003,252 +1007,562 @@ fun ToBuyItemRow(
 }
 
 @Composable
-fun AddToBuyCustomDialog(
+fun AddToFordoDialog(
+    viewModel: MainViewModel,
     language: AppLanguage,
     currencySymbol: String,
-    onDismiss: () -> Unit,
-    onConfirm: (
-        nameEn: String,
-        nameBn: String,
-        category: String,
-        quantity: Double,
-        unit: String,
-        rate: Double,
-        estimatedPrice: Double,
-        notes: String,
-        isPrivate: Boolean
-    ) -> Unit
+    onDismiss: () -> Unit
 ) {
     val isBn = language == AppLanguage.BENGALI
+    val vaultItems by viewModel.pantryItems.collectAsState()
+    val toBuyItems by viewModel.toBuyItems.collectAsState()
 
-    var nameEn by remember { mutableStateOf("") }
-    var nameBn by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("VEGETABLES") }
-    var quantityStr by remember { mutableStateOf("1") }
-    var unit by remember { mutableStateOf("kg") }
-    var rateStr by remember { mutableStateOf("") }
-    var priceStr by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
-    var isPrivate by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var selectedTab by remember { mutableStateOf(0) } // 0: From Vault, 1: Custom Item
+    var vaultSearchQuery by remember { mutableStateOf("") }
+    var selectedCategoryFilter by remember { mutableStateOf("ALL") }
+    var actionNotice by remember { mutableStateOf<String?>(null) }
 
-    fun recalculatePrice(q: String, r: String) {
-        val qVal = q.toDoubleOrNull() ?: 0.0
-        val rVal = r.toDoubleOrNull() ?: 0.0
-        if (qVal > 0 && rVal > 0) {
-            priceStr = (qVal * rVal).toString()
+    // Map of itemId to chosen add quantity
+    val chosenQuantities = remember { mutableStateMapOf<Long, Double>() }
+
+    // Custom Item states
+    var customNameEn by remember { mutableStateOf("") }
+    var customNameBn by remember { mutableStateOf("") }
+    var customCategory by remember { mutableStateOf("VEGETABLES") }
+    var customQtyStr by remember { mutableStateOf("1") }
+    var customUnit by remember { mutableStateOf("kg") }
+    var customRateStr by remember { mutableStateOf("") }
+    var customPriceStr by remember { mutableStateOf("") }
+    var customNotes by remember { mutableStateOf("") }
+    var customIsPrivate by remember { mutableStateOf(false) }
+    var customError by remember { mutableStateOf<String?>(null) }
+
+    val filteredVaultItems = vaultItems.filter { item ->
+        val matchesCategory = when (selectedCategoryFilter) {
+            "ALL" -> true
+            "VEGETABLES" -> item.category == "VEGETABLES"
+            "SPICES" -> item.category == "SPICES"
+            "MEDICINE" -> item.category == "MEDICINE"
+            "GARMENTS" -> item.category == "GARMENTS"
+            "HARDWARE" -> item.category == "HARDWARE"
+            "HOUSEHOLD" -> item.category == "HOUSEHOLD"
+            "STAPLES" -> item.category == "STAPLES"
+            else -> true
         }
+        val matchesSearch = vaultSearchQuery.isBlank() ||
+                item.nameEn.contains(vaultSearchQuery, ignoreCase = true) ||
+                item.nameBn.contains(vaultSearchQuery, ignoreCase = true)
+        matchesCategory && matchesSearch
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = if (isBn) "🛒 বাজার ফর্দে নতুন পণ্য" else "🛒 Add to Shopping List",
-                fontWeight = FontWeight.Bold
-            )
+            Column {
+                Text(
+                    text = if (isBn) "🛒 বাজার ফর্দে পণ্য যোগ করুন" else "🛒 Add Items to Shopping List",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = if (isBn) "ভল্টের মজুদ তালিকা থেকে পণ্য বেছে ফর্দে যোগ করুন"
+                    else "Select items already added in your Vault or add custom items",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+            ) {
+                // Tab Selection: From Vault (Default) vs Custom Item
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    modifier = Modifier.fillMaxWidth().testTag("add_to_fordo_tabs")
                 ) {
-                    FilterChip(
-                        selected = selectedCategory == "VEGETABLES",
-                        onClick = { selectedCategory = "VEGETABLES"; unit = "kg" },
-                        label = { Text(if (isBn) "🥬 শাকসবজি" else "🥬 Veg", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "SPICES",
-                        onClick = { selectedCategory = "SPICES"; unit = "g" },
-                        label = { Text(if (isBn) "🧂 মসলা" else "🧂 Spice", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "MEDICINE",
-                        onClick = {
-                            selectedCategory = "MEDICINE"
-                            nameEn = "Paracetamol 500mg"
-                            nameBn = "প্যারাসিটামল"
-                            unit = "tablet"
-                            quantityStr = "10"
-                            rateStr = "1.5"
-                            priceStr = "15.0"
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
+                            Text(
+                                text = if (isBn) "ভল্টের মজুদ থেকে (${vaultItems.size})" else "From Vault (${vaultItems.size})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         },
-                        label = { Text(if (isBn) "💊 ঔষধ" else "💊 Medicine", fontSize = 11.sp) }
+                        modifier = Modifier.testTag("tab_from_vault")
                     )
-                    FilterChip(
-                        selected = selectedCategory == "GARMENTS",
-                        onClick = {
-                            selectedCategory = "GARMENTS"
-                            nameEn = "Cotton Saree"
-                            nameBn = "সুতি শাড়ি"
-                            unit = "pcs"
-                            quantityStr = "1"
-                            rateStr = "850.0"
-                            priceStr = "850.0"
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = {
+                            Text(
+                                text = if (isBn) "কাস্টম পণ্য" else "Custom Item",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         },
-                        label = { Text(if (isBn) "👕 পোশাক" else "👕 Garments", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "HARDWARE",
-                        onClick = {
-                            selectedCategory = "HARDWARE"
-                            nameEn = "LED Light Bulb"
-                            nameBn = "এলইডি লাইট বাল্ব"
-                            unit = "pcs"
-                            quantityStr = "2"
-                            rateStr = "120.0"
-                            priceStr = "240.0"
-                        },
-                        label = { Text(if (isBn) "🔧 হার্ডওয়্যার" else "🔧 Hardware", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "HOUSEHOLD",
-                        onClick = {
-                            selectedCategory = "HOUSEHOLD"
-                            nameEn = "Detergent Powder"
-                            nameBn = "ডিটারজেন্ট সার্ফ"
-                            unit = "kg"
-                            quantityStr = "1"
-                            rateStr = "140.0"
-                            priceStr = "140.0"
-                        },
-                        label = { Text(if (isBn) "🏠 গৃহস্থালি" else "🏠 Household", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "STAPLES",
-                        onClick = { selectedCategory = "STAPLES" },
-                        label = { Text(if (isBn) "🍚 রসদ" else "🍚 Staples", fontSize = 11.sp) }
-                    )
-                    FilterChip(
-                        selected = selectedCategory == "OTHERS",
-                        onClick = { selectedCategory = "OTHERS"; unit = "pcs" },
-                        label = { Text(if (isBn) "📦 অন্যান্য" else "📦 Others", fontSize = 11.sp) }
+                        modifier = Modifier.testTag("tab_custom_item")
                     )
                 }
 
-                OutlinedTextField(
-                    value = nameEn,
-                    onValueChange = { nameEn = it },
-                    label = { Text(if (isBn) "ইংরেজি নাম" else "English Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("tobuy_name_en_input")
-                )
-                OutlinedTextField(
-                    value = nameBn,
-                    onValueChange = { nameBn = it },
-                    label = { Text(if (isBn) "বাংলা নাম" else "Bengali Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("tobuy_name_bn_input")
-                )
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = quantityStr,
-                        onValueChange = {
-                            quantityStr = it
-                            recalculatePrice(it, rateStr)
-                        },
-                        label = { Text(if (isBn) "পরিমাণ" else "Quantity") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f).testTag("tobuy_quantity_input")
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    OutlinedTextField(
-                        value = unit,
-                        onValueChange = { unit = it },
-                        label = { Text(if (isBn) "একক" else "Unit") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = rateStr,
-                        onValueChange = {
-                            rateStr = it
-                            recalculatePrice(quantityStr, it)
-                        },
-                        label = { Text(if (isBn) "দর প্রতি একক ($currencySymbol)" else "Rate ($currencySymbol)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    OutlinedTextField(
-                        value = priceStr,
-                        onValueChange = { priceStr = it },
-                        label = { Text(if (isBn) "মোট প্রাক্কলন ($currencySymbol)" else "Est Price ($currencySymbol)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (actionNotice != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = actionNotice ?: "",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
 
-                OutlinedTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = { Text(if (isBn) "নোট / ব্র্যান্ড / দোকান" else "Notes / Brand / Shop") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (selectedTab == 0) {
+                    // TAB 0: Select from items already added in Vault
+                    OutlinedTextField(
+                        value = vaultSearchQuery,
+                        onValueChange = { vaultSearchQuery = it },
+                        placeholder = {
+                            Text(if (isBn) "ভল্টের পণ্য খুঁজুন (আলু, জিরা, ঔষধ)..." else "Search vault items...")
+                        },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, Modifier.size(18.dp)) },
+                        trailingIcon = {
+                            if (vaultSearchQuery.isNotEmpty()) {
+                                IconButton(onClick = { vaultSearchQuery = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Clear", Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("vault_search_in_fordo")
+                    )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = if (isBn) "গোপন ফর্দ (স্বামী-স্ত্রী প্রাইভেট)" else "Private between Couple",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Category filter chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedCategoryFilter == "ALL",
+                            onClick = { selectedCategoryFilter = "ALL" },
+                            label = { Text(if (isBn) "সব" else "All", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "VEGETABLES",
+                            onClick = { selectedCategoryFilter = "VEGETABLES" },
+                            label = { Text(if (isBn) "🥬 শাকসবজি" else "🥬 Veg", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "SPICES",
+                            onClick = { selectedCategoryFilter = "SPICES" },
+                            label = { Text(if (isBn) "🧂 মসলা" else "🧂 Spice", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "MEDICINE",
+                            onClick = { selectedCategoryFilter = "MEDICINE" },
+                            label = { Text(if (isBn) "💊 ঔষধ" else "💊 Med", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "HOUSEHOLD",
+                            onClick = { selectedCategoryFilter = "HOUSEHOLD" },
+                            label = { Text(if (isBn) "🏠 গৃহস্থালি" else "🏠 Household", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "GARMENTS",
+                            onClick = { selectedCategoryFilter = "GARMENTS" },
+                            label = { Text(if (isBn) "👕 পোশাক" else "👕 Garments", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "HARDWARE",
+                            onClick = { selectedCategoryFilter = "HARDWARE" },
+                            label = { Text(if (isBn) "🔧 হার্ডওয়্যার" else "🔧 Hardware", fontSize = 10.sp) }
+                        )
+                        FilterChip(
+                            selected = selectedCategoryFilter == "STAPLES",
+                            onClick = { selectedCategoryFilter = "STAPLES" },
+                            label = { Text(if (isBn) "🍚 রসদ" else "🍚 Staples", fontSize = 10.sp) }
                         )
                     }
-                    Switch(checked = isPrivate, onCheckedChange = { isPrivate = it })
-                }
 
-                if (errorMessage != null) {
-                    Text(text = errorMessage ?: "", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (filteredVaultItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (isBn) "ভল্টে কোনো পণ্য পাওয়া যায়নি" else "No matching items in Vault",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                TextButton(onClick = { selectedTab = 1 }) {
+                                    Text(if (isBn) "কাস্টম পণ্য যোগ করুন" else "Add Custom Item")
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(filteredVaultItems, key = { it.id }) { vaultItem ->
+                                val defaultStep = if (vaultItem.unit == "kg") 1.0 else if (vaultItem.unit == "g") 100.0 else 1.0
+                                val chosenQty = chosenQuantities[vaultItem.id] ?: (if (vaultItem.unit == "kg") 1.0 else if (vaultItem.unit == "g") 250.0 else 1.0)
+                                val isInFordo = toBuyItems.any {
+                                    it.pantryItemId == vaultItem.id ||
+                                    it.nameEn.equals(vaultItem.nameEn, ignoreCase = true) ||
+                                    it.nameBn.equals(vaultItem.nameBn, ignoreCase = true)
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().testTag("vault_item_for_fordo_${vaultItem.id}"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isInFordo)
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                                        else
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = if (isBn) vaultItem.nameBn else vaultItem.nameEn,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 14.sp
+                                                    )
+                                                    if (isInFordo) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Surface(
+                                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                                            shape = RoundedCornerShape(4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = if (isBn) "ফর্দে আছে ✓" else "In List ✓",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                Text(
+                                                    text = if (isBn)
+                                                        "ভল্ট স্টক: ${vaultItem.quantity} ${vaultItem.unit}${if (vaultItem.rate > 0) " • দর: $currencySymbol${vaultItem.rate}" else ""}"
+                                                    else
+                                                        "Vault stock: ${vaultItem.quantity} ${vaultItem.unit}${if (vaultItem.rate > 0) " • Rate: $currencySymbol${vaultItem.rate}" else ""}",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
+                                            }
+
+                                            // In-line Stepper
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = {
+                                                        val next = (chosenQty - defaultStep).coerceAtLeast(0.5)
+                                                        chosenQuantities[vaultItem.id] = next
+                                                    },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Remove, contentDescription = "Minus", Modifier.size(12.dp))
+                                                }
+
+                                                Text(
+                                                    text = "$chosenQty ${vaultItem.unit}",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                                )
+
+                                                IconButton(
+                                                    onClick = {
+                                                        val next = chosenQty + defaultStep
+                                                        chosenQuantities[vaultItem.id] = next
+                                                    },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Add, contentDescription = "Plus", Modifier.size(12.dp))
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(6.dp))
+
+                                        // Action Button: Add to Fordo
+                                        Button(
+                                            onClick = {
+                                                val qtyToAdd = chosenQuantities[vaultItem.id] ?: (if (vaultItem.unit == "kg") 1.0 else if (vaultItem.unit == "g") 250.0 else 1.0)
+                                                val estPrice = if (vaultItem.rate > 0) (vaultItem.rate * qtyToAdd) else 0.0
+                                                viewModel.addToBuyItem(
+                                                    nameEn = vaultItem.nameEn,
+                                                    nameBn = vaultItem.nameBn,
+                                                    category = vaultItem.category,
+                                                    quantity = qtyToAdd,
+                                                    unit = vaultItem.unit,
+                                                    rate = vaultItem.rate,
+                                                    estimatedPrice = estPrice,
+                                                    notes = "Added from Vault",
+                                                    isPrivate = vaultItem.isPrivate
+                                                )
+                                                actionNotice = if (isBn)
+                                                    "✅ '${vaultItem.nameBn}' ($qtyToAdd ${vaultItem.unit}) ফর্দে যোগ করা হয়েছে!"
+                                                else
+                                                    "✅ Added '${vaultItem.nameEn}' ($qtyToAdd ${vaultItem.unit}) to shopping list!"
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(34.dp).testTag("btn_add_vault_item_to_fordo_${vaultItem.id}"),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (isInFordo)
+                                                    (if (isBn) "+ ফর্দে পরিমাণ বাড়ান" else "+ Increase Quantity")
+                                                else
+                                                    (if (isBn) "ফর্দে যোগ করুন" else "Add to Shopping List"),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // TAB 1: Custom Item Creation Form
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (isBn)
+                                    "💡 টিপ: স্থায়ী পারিবারিক রসদ ম্যানেজ করতে 'গিন্নির ভল্ট' ট্যাবে নতুন পণ্য তৈরি করুন।"
+                                else
+                                    "💡 Tip: For permanent household inventory, create new items in the 'Ginnir Vault' tab.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+
+                        // Category Selector
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            FilterChip(
+                                selected = customCategory == "VEGETABLES",
+                                onClick = { customCategory = "VEGETABLES"; customUnit = "kg" },
+                                label = { Text(if (isBn) "🥬 শাকসবজি" else "🥬 Veg", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "SPICES",
+                                onClick = { customCategory = "SPICES"; customUnit = "g" },
+                                label = { Text(if (isBn) "🧂 মসলা" else "🧂 Spice", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "MEDICINE",
+                                onClick = { customCategory = "MEDICINE"; customUnit = "tablet" },
+                                label = { Text(if (isBn) "💊 ঔষধ" else "💊 Med", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "GARMENTS",
+                                onClick = { customCategory = "GARMENTS"; customUnit = "pcs" },
+                                label = { Text(if (isBn) "👕 পোশাক" else "👕 Garments", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "HARDWARE",
+                                onClick = { customCategory = "HARDWARE"; customUnit = "pcs" },
+                                label = { Text(if (isBn) "🔧 হার্ডওয়্যার" else "🔧 Hardware", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "HOUSEHOLD",
+                                onClick = { customCategory = "HOUSEHOLD"; customUnit = "kg" },
+                                label = { Text(if (isBn) "🏠 গৃহস্থালি" else "🏠 Household", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "STAPLES",
+                                onClick = { customCategory = "STAPLES" },
+                                label = { Text(if (isBn) "🍚 রসদ" else "🍚 Staples", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = customCategory == "OTHERS",
+                                onClick = { customCategory = "OTHERS"; customUnit = "pcs" },
+                                label = { Text(if (isBn) "📦 অন্যান্য" else "📦 Others", fontSize = 11.sp) }
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = customNameEn,
+                            onValueChange = { customNameEn = it },
+                            label = { Text(if (isBn) "ইংরেজি নাম" else "English Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("tobuy_name_en_input")
+                        )
+                        OutlinedTextField(
+                            value = customNameBn,
+                            onValueChange = { customNameBn = it },
+                            label = { Text(if (isBn) "বাংলা নাম" else "Bengali Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("tobuy_name_bn_input")
+                        )
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = customQtyStr,
+                                onValueChange = {
+                                    customQtyStr = it
+                                    val q = it.toDoubleOrNull() ?: 0.0
+                                    val r = customRateStr.toDoubleOrNull() ?: 0.0
+                                    if (q > 0 && r > 0) customPriceStr = (q * r).toString()
+                                },
+                                label = { Text(if (isBn) "পরিমাণ" else "Quantity") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f).testTag("tobuy_quantity_input")
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            OutlinedTextField(
+                                value = customUnit,
+                                onValueChange = { customUnit = it },
+                                label = { Text(if (isBn) "একক" else "Unit") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = customRateStr,
+                                onValueChange = {
+                                    customRateStr = it
+                                    val q = customQtyStr.toDoubleOrNull() ?: 0.0
+                                    val r = it.toDoubleOrNull() ?: 0.0
+                                    if (q > 0 && r > 0) customPriceStr = (q * r).toString()
+                                },
+                                label = { Text(if (isBn) "দর ($currencySymbol)" else "Rate ($currencySymbol)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            OutlinedTextField(
+                                value = customPriceStr,
+                                onValueChange = { customPriceStr = it },
+                                label = { Text(if (isBn) "মোট মূল্য ($currencySymbol)" else "Total ($currencySymbol)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value = customNotes,
+                            onValueChange = { customNotes = it },
+                            label = { Text(if (isBn) "নোট / দোকান" else "Notes / Shop") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isBn) "গোপন ফর্দ (স্বামী-স্ত্রী প্রাইভেট)" else "Private between Couple",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Switch(checked = customIsPrivate, onCheckedChange = { customIsPrivate = it })
+                        }
+
+                        if (customError != null) {
+                            Text(text = customError ?: "", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                if (customNameEn.isBlank() && customNameBn.isBlank()) {
+                                    customError = if (isBn) "পণ্যের নাম লিখুন" else "Enter item name"
+                                    return@Button
+                                }
+                                val q = customQtyStr.toDoubleOrNull() ?: 1.0
+                                val r = customRateStr.toDoubleOrNull() ?: 0.0
+                                val p = customPriceStr.toDoubleOrNull() ?: (q * r)
+                                viewModel.addToBuyItem(
+                                    nameEn = customNameEn.ifBlank { customNameBn },
+                                    nameBn = customNameBn.ifBlank { customNameEn },
+                                    category = customCategory,
+                                    quantity = q,
+                                    unit = customUnit.ifBlank { "kg" },
+                                    rate = r,
+                                    estimatedPrice = p,
+                                    notes = customNotes,
+                                    isPrivate = customIsPrivate
+                                )
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("confirm_add_custom_tobuy_button")
+                        ) {
+                            Text(if (isBn) "ফর্দে কাস্টম পণ্য যোগ করুন" else "Add Custom Item to List")
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    if (nameEn.isBlank() && nameBn.isBlank()) {
-                        errorMessage = if (isBn) "পণ্যের নাম লিখুন" else "Enter item name"
-                        return@Button
-                    }
-                    val qty = quantityStr.toDoubleOrNull() ?: 1.0
-                    val rate = rateStr.toDoubleOrNull() ?: 0.0
-                    val est = priceStr.toDoubleOrNull() ?: (rate * qty)
-
-                    onConfirm(
-                        nameEn.ifBlank { nameBn },
-                        nameBn.ifBlank { nameEn },
-                        selectedCategory,
-                        qty,
-                        unit.ifBlank { "kg" },
-                        rate,
-                        est,
-                        notes,
-                        isPrivate
-                    )
-                    onDismiss()
-                },
-                modifier = Modifier.testTag("confirm_add_tobuy_button")
-            ) {
-                Text(if (isBn) "যোগ করুন" else "Add")
+            Button(onClick = onDismiss, modifier = Modifier.testTag("close_add_to_fordo_btn")) {
+                Text(if (isBn) "সম্পন্ন" else "Done")
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(if (isBn) "বাতিল" else "Cancel")
-            }
-        }
+        dismissButton = null
     )
 }

@@ -20,7 +20,7 @@ object PdfGenerator {
         context: Context,
         items: List<ToBuyItemEntity>,
         userName: String,
-        currency: String = "৳"
+        currency: String = "₹"
     ): File? {
         val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
         val dateStr = dateFormat.format(Date())

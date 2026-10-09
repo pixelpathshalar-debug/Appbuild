@@ -66,7 +66,7 @@ fun GinnirHishabScreen(
     val pantryItems by viewModel.pantryItems.collectAsState()
     val toBuyItems by viewModel.toBuyItems.collectAsState()
 
-    val currency = currentUser?.currencySymbol ?: "৳"
+    val currency = currentUser?.currencySymbol ?: "₹"
 
     // Financial calculations
     val totalVaultValue = pantryItems.sumOf {

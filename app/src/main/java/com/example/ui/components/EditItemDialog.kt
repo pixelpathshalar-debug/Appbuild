@@ -44,7 +44,7 @@ import com.example.util.AppLanguage
 fun EditItemDialog(
     item: PantryItemEntity,
     language: AppLanguage,
-    currencySymbol: String = "৳",
+    currencySymbol: String = "₹",
     onDismiss: () -> Unit,
     onSave: (PantryItemEntity) -> Unit
 ) {

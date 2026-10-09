@@ -80,9 +80,9 @@ fun AuthScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Login, 1: Register
     var identifierType by remember { mutableStateOf("PHONE") } // PHONE or EMAIL
-    var identifier by remember { mutableStateOf("+8801712345678") }
-    var name by remember { mutableStateOf("Tariqul Islam") }
-    var companionId by remember { mutableStateOf("+8801798765432") }
+    var identifier by remember { mutableStateOf("+919876543210") }
+    var name by remember { mutableStateOf("Suparna Kanti Datta") }
+    var companionId by remember { mutableStateOf("+919876543211") }
     var companionRole by remember { mutableStateOf("WIFE") }
 
     var otpCode by remember { mutableStateOf("") }
@@ -213,7 +213,7 @@ fun AuthScreen(
                                 selected = identifierType == "PHONE",
                                 onClick = {
                                     identifierType = "PHONE"
-                                    identifier = "+8801712345678"
+                                    identifier = "+919876543210"
                                 },
                                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, Modifier.size(16.dp)) },
                                 label = { Text(if (isBn) "মোবাইল নম্বর" else "Phone") },
@@ -483,7 +483,7 @@ fun AuthScreen(
                     // 1-Click Quick Demo User login
                     OutlinedButton(
                         onClick = {
-                            viewModel.loginWithOtp("+8801712345678", "123456")
+                            viewModel.loginWithOtp("+919876543210", "123456")
                             onAuthSuccess()
                         },
                         modifier = Modifier

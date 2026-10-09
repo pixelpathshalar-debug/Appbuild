@@ -45,6 +45,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -111,7 +112,7 @@ fun InventoryScreen(
         }
     }
 
-    val currency = currentUser?.currencySymbol ?: "৳"
+    val currency = currentUser?.currencySymbol ?: "₹"
     val lowStockCount = items.count { it.isLowStock }
     val finishedCount = items.count { it.isFinished }
 
@@ -219,19 +220,62 @@ fun InventoryScreen(
                 }
             }
 
+            // Quick Actions Row: Create New Item in Vault & Voice Command
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { showAddDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .testTag("btn_create_new_vault_item")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isBn) "ভল্টে নতুন পণ্য তৈরি ➕" else "Create Item in Vault ➕",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Button(
+                        onClick = { showVoiceDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .testTag("voice_command_btn_inventory")
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null, Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isBn) "ভয়েস কমান্ড 🎙️" else "Voice 🎙️",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
             // Voice Command Banner / Trigger
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable { showVoiceDialog = true }
-                        .testTag("voice_command_banner_card"),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                    shape = RoundedCornerShape(16.dp)
+                    onClick = { showVoiceDialog = true }
                 ) {
                     Row(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -539,14 +583,14 @@ fun InventoryScreen(
                 Icon(Icons.Default.Mic, contentDescription = "Voice")
             }
 
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
+                icon = { Icon(Icons.Default.Add, contentDescription = "Create New Item") },
+                text = { Text(if (isBn) "ভল্টে নতুন পণ্য তৈরি করুন" else "Create Item in Vault", fontWeight = FontWeight.Bold, fontSize = 12.sp) },
                 modifier = Modifier.testTag("fab_add_item")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Item")
-            }
+            )
         }
     }
 

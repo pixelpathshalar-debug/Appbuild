@@ -42,7 +42,7 @@ import com.example.util.AppLanguage
 @Composable
 fun AddItemDialog(
     language: AppLanguage,
-    currencySymbol: String = "৳",
+    currencySymbol: String = "₹",
     onDismiss: () -> Unit,
     onConfirm: (
         nameEn: String,
@@ -57,15 +57,15 @@ fun AddItemDialog(
         isPrivate: Boolean
     ) -> Unit
 ) {
-    var nameEn by remember { mutableStateOf("Potato") }
-    var nameBn by remember { mutableStateOf("আলু") }
+    var nameEn by remember { mutableStateOf("") }
+    var nameBn by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("VEGETABLES") }
-    var quantityStr by remember { mutableStateOf("5.0") }
+    var quantityStr by remember { mutableStateOf("1.0") }
     var unit by remember { mutableStateOf("kg") }
-    var minThresholdStr by remember { mutableStateOf("1.0") }
-    var rateStr by remember { mutableStateOf("30.0") }
-    var priceStr by remember { mutableStateOf("150.0") }
-    var notes by remember { mutableStateOf("Fresh market purchase") }
+    var minThresholdStr by remember { mutableStateOf("0.5") }
+    var rateStr by remember { mutableStateOf("") }
+    var priceStr by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
     var isPrivate by remember { mutableStateOf(false) }
 
     var unitDropdownExpanded by remember { mutableStateOf(false) }
@@ -84,11 +84,19 @@ fun AddItemDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(
-                text = if (isBn) "➕ নতুন পণ্য ও দর যোগ" else "➕ Add Item & Rate",
-                fontWeight = FontWeight.Bold,
-                fontSize = 19.sp
-            )
+            Column {
+                Text(
+                    text = if (isBn) "🏛️ ভল্টে নতুন পণ্য তৈরি করুন" else "🏛️ Create New Item in Vault",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = if (isBn) "ভল্টের স্থায়ী মজুদ হিসেবে যুক্ত হবে এবং বাজার ফর্দে যোগ করার জন্য প্রস্তুত থাকবে"
+                    else "Item will be created in Vault and available for shopping list",
+                    fontSize = 11.sp,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.outline
+                )
+            }
         },
         text = {
             Column(

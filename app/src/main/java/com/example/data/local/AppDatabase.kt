@@ -18,15 +18,17 @@ import kotlinx.coroutines.launch
         ActivityLogEntity::class,
         WebhookConfigEntity::class,
         ShariKeyEntity::class,
-        ScannedImageEntity::class
+        ScannedImageEntity::class,
+        MarketGuideEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun pantryDao(): PantryDao
     abstract fun toBuyDao(): ToBuyDao
     abstract fun userDao(): UserDao
+    abstract fun marketGuideDao(): MarketGuideDao
 
     companion object {
         @Volatile
@@ -215,13 +217,13 @@ abstract class AppDatabase : RoomDatabase() {
             )
             val demoUser = UserEntity(
                 id = "user_01",
-                name = "Tariqul Islam",
-                identifier = "+8801712345678",
+                name = "Suparna Kanti Datta",
+                identifier = "+919876543210",
                 role = "USER",
                 status = "ACTIVE",
-                companionIdentifier = "+8801798765432",
+                companionIdentifier = "+919876543211",
                 companionRole = "WIFE",
-                currencySymbol = "৳",
+                currencySymbol = "₹",
                 preferredLanguage = "bn",
                 avatarColor = 0xFFD84315
             )
@@ -256,7 +258,7 @@ abstract class AppDatabase : RoomDatabase() {
                 ShariKeyEntity(
                     memberName = "স্বামী (Husband)",
                     relation = "SPOUSE",
-                    contactIdentifier = "+8801798765432",
+                    contactIdentifier = "+919876543211",
                     keyCode = "GINNI-SPOUSE-4421",
                     role = "BUYER",
                     canCheckStock = true,
@@ -266,6 +268,8 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
 
+            db.marketGuideDao().insertItems(starterMarketGuideItems)
+
             db.userDao().insertLog(
                 ActivityLogEntity(
                     titleEn = "System initialized with vegetables, spices, household items & Shari-Keys",
@@ -274,5 +278,203 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
         }
+
+        val starterMarketGuideItems = listOf(
+            MarketGuideEntity(
+                nameEn = "Potato",
+                nameBn = "আলু",
+                sectionEn = "Vegetable Bazaar",
+                sectionBn = "কাঁচাবাজার",
+                locationTipEn = "Front row vegetable wholesalers; sold in 5kg/10kg bags or loose",
+                locationTipBn = "কাঁচাবাজারের প্রধান পাইকারি ও খুচরা চালানে বস্তাভর্তি বা পাল্লা ধরে পাওয়া যায়",
+                buyingTipEn = "Select smooth, firm potatoes without green tint or soft sprouts",
+                buyingTipBn = "সবুজ ছোপ বা চোখ ওঠা ছাড়া মসৃণ, শক্ত ডায়মন্ড বা লাল গোল আলু বাছুন",
+                minPrice = 30.0,
+                maxPrice = 45.0,
+                priceUnit = "kg",
+                defaultUnit = "kg",
+                defaultQty = 5.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Onion",
+                nameBn = "পেঁয়াজ",
+                sectionEn = "Vegetable Bazaar",
+                sectionBn = "কাঁচাবাজার",
+                locationTipEn = "Near potato stalls, sold in 1kg to 5kg palla",
+                locationTipBn = "আলুর পাশেই বড় ঝুঁড়িতে থাকে, দেশি ও আমদানিকৃত আলাদা থাকে",
+                buyingTipEn = "Choose dry, tight skin with no damp neck or mold",
+                buyingTipBn = "শুকনো পাতলা খোসাযুক্ত মাঝারি দেশি পেঁয়াজ সবচেয়ে ঝাঁজালো",
+                minPrice = 70.0,
+                maxPrice = 90.0,
+                priceUnit = "kg",
+                defaultUnit = "kg",
+                defaultQty = 2.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Green Chili",
+                nameBn = "কাঁচা মরিচ",
+                sectionEn = "Vegetable Bazaar",
+                sectionBn = "কাঁচাবাজার",
+                locationTipEn = "Fresh herb & greens row (beside coriander & ginger)",
+                locationTipBn = "ধনেপাতা ও লেবুর সারিতে ছোট ঝুড়িতে তাজা মরিচ বিক্রি হয়",
+                buyingTipEn = "Look for deep green color, intact green stems, and crisp snap",
+                buyingTipBn = "গাঢ় সবুজ রঙ ও তাজা সবুজ বোঁটাযুক্ত মরিচ বাছাই করুন",
+                minPrice = 120.0,
+                maxPrice = 180.0,
+                priceUnit = "kg",
+                defaultUnit = "kg",
+                defaultQty = 0.5
+            ),
+            MarketGuideEntity(
+                nameEn = "Tomato",
+                nameBn = "টমেটো",
+                sectionEn = "Vegetable Bazaar",
+                sectionBn = "কাঁচাবাজার",
+                locationTipEn = "Produce center displays, arranged in crates",
+                locationTipBn = "কাঁচাবাজারের মাঝের সারিতে কাঠের বা প্লাস্টিকের ক্রেটে সাজানো থাকে",
+                buyingTipEn = "Even red tone, glossy skin, slightly firm to touch without bruises",
+                buyingTipBn = "চকচকে লাল ও দাগহীন শক্ত টমেটো কিনুন, বেশি নরম এড়িয়ে চলুন",
+                minPrice = 60.0,
+                maxPrice = 90.0,
+                priceUnit = "kg",
+                defaultUnit = "kg",
+                defaultQty = 1.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Garlic",
+                nameBn = "রসুন",
+                sectionEn = "Spice Market",
+                sectionBn = "মসলা ও পসারি দোকান",
+                locationTipEn = "Spice & dry produce stalls, hung in mesh bags",
+                locationTipBn = "মসলার দোকানে ঝুলিয়ে রাখা জালিতে বা স্তূপ করে রাখা থাকে",
+                buyingTipEn = "Plump, tight bulbs that don't yield when pressed gently",
+                buyingTipBn = "দেশি ছোট কোয়া রসুন বেশি সুবাসযুক্ত, শুকনো শক্ত খোসা দেখে নিন",
+                minPrice = 180.0,
+                maxPrice = 240.0,
+                priceUnit = "kg",
+                defaultUnit = "g",
+                defaultQty = 250.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Ginger",
+                nameBn = "আদা",
+                sectionEn = "Spice Market",
+                sectionBn = "মসলা ও পসারি দোকান",
+                locationTipEn = "Beside garlic and whole spice heaps",
+                locationTipBn = "রসুনের পাশেই আদার স্তূপ থাকে, দেশি ও বার্মিজ জাত পাওয়া যায়",
+                buyingTipEn = "Smooth skin, spicy puncture aroma, snappy fiber",
+                buyingTipBn = "মসৃণ ত্বক এবং নখ দিয়ে চাপলে সুবাসিত রস বের হয় এমন আদা নিন",
+                minPrice = 200.0,
+                maxPrice = 260.0,
+                priceUnit = "kg",
+                defaultUnit = "g",
+                defaultQty = 250.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Cumin (Jeera)",
+                nameBn = "জিরা",
+                sectionEn = "Spice Market",
+                sectionBn = "মসলা ও পসারি দোকান",
+                locationTipEn = "Traditional spice merchants (Poshari shops) with glass jars or sacks",
+                locationTipBn = "পসারি ও পাইকারি মসলার দোকানে বস্তা বা কাঁচের বয়ামে থাকে",
+                buyingTipEn = "Small uniform brown seeds, warm fragrant aroma when crushed",
+                buyingTipBn = "হাতে ঘষলে তীব্র খাঁটি সুবাস আসবে, ধুলাবালিমুক্ত জিরা কিনুন",
+                minPrice = 750.0,
+                maxPrice = 950.0,
+                priceUnit = "kg",
+                defaultUnit = "g",
+                defaultQty = 100.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Turmeric",
+                nameBn = "হলুদ",
+                sectionEn = "Spice Market",
+                sectionBn = "মসলা ও পসারি দোকান",
+                locationTipEn = "Whole dried roots or freshly ground at spice mill counter",
+                locationTipBn = "শুকনো হলুদ গাট বা মসলা ভাঙ্গানোর কলের সামনে খাঁটি গুঁড়া পাওয়া যায়",
+                buyingTipEn = "Deep golden orange color, avoid adulterated yellowish powder",
+                buyingTipBn = "গাঢ় সোনালী রঙ ও প্রাকৃতিকভাবে ভাঙানো হলুদ স্বাস্থ্যসম্মত",
+                minPrice = 320.0,
+                maxPrice = 400.0,
+                priceUnit = "kg",
+                defaultUnit = "g",
+                defaultQty = 200.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Cardamom (Elachi)",
+                nameBn = "সবুজ এলাচ",
+                sectionEn = "Spice Market",
+                sectionBn = "মসলা ও পসারি দোকান",
+                locationTipEn = "Aromatic spices shelf in grocer/spice shops",
+                locationTipBn = "দামী মসলার তাকে কাঁচের পাত্রে সিল করা থাকে",
+                buyingTipEn = "Fat green pods with fragrant seeds inside, not bleached white",
+                buyingTipBn = "বড় সবুজ দানাযুক্ত এলাচ কিনুন, ফ্যাকাশে সাদা বা শুকনো দানা বাদ দিন",
+                minPrice = 3000.0,
+                maxPrice = 3800.0,
+                priceUnit = "kg",
+                defaultUnit = "g",
+                defaultQty = 50.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Paracetamol (Napa/Ace)",
+                nameBn = "প্যারাসিটামল (নাপা/এইস)",
+                sectionEn = "Pharmacy",
+                sectionBn = "ঔষধের দোকান / ফার্মেসি",
+                locationTipEn = "Licensed chemist shops and market pharmacy counters",
+                locationTipBn = "বাজারের প্রবেশমুখে বা প্রধান গলির ফার্মেসিতে পাওয়া যায়",
+                buyingTipEn = "Check expiry date and strip seal integrity",
+                buyingTipBn = "মেয়াদোত্তীর্ণ তারিখ ও অক্ষত ফয়েল স্ট্রিপ দেখে নিন",
+                minPrice = 15.0,
+                maxPrice = 25.0,
+                priceUnit = "strip",
+                defaultUnit = "strip",
+                defaultQty = 2.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Cotton Saree (Shari)",
+                nameBn = "সুতি শাড়ি",
+                sectionEn = "Garments",
+                sectionBn = "পোশাক ও কাপড়ের দোকান",
+                locationTipEn = "Textile corner, handloom sarees and cloth merchants",
+                locationTipBn = "বাজারের কাপড় পট্টি বা তাঁতের কাপড়ের দোকান",
+                buyingTipEn = "Check cotton yarn thread count and border print",
+                buyingTipBn = "সুতির মান, সুতার বুনন ও আঁচলের পাড় পরীক্ষা করে নিন",
+                minPrice = 750.0,
+                maxPrice = 1500.0,
+                priceUnit = "pcs",
+                defaultUnit = "pcs",
+                defaultQty = 1.0
+            ),
+            MarketGuideEntity(
+                nameEn = "LED Bulb & Socket",
+                nameBn = "এলইডি বাল্ব ও সুইচ",
+                sectionEn = "Hardware",
+                sectionBn = "হার্ডওয়্যার ও ইলেকট্রিক দোকান",
+                locationTipEn = "Electric & hardware corner near bazaar entrance",
+                locationTipBn = "বাজারের ইলেকট্রিক ও হার্ডওয়্যার দোকানে ওয়ারেন্টি সহ মেলে",
+                buyingTipEn = "Ensure brand warranty card & lumens rating (9W/12W/15W)",
+                buyingTipBn = "ওয়ারেন্টি সীল ও ৯ ওয়াট/১২ ওয়াট আলো নিশ্চিত করুন",
+                minPrice = 110.0,
+                maxPrice = 180.0,
+                priceUnit = "pcs",
+                defaultUnit = "pcs",
+                defaultQty = 2.0
+            ),
+            MarketGuideEntity(
+                nameEn = "Detergent & Dish Soap",
+                nameBn = "ডিটারজেন্ট ও ভিম সাবান",
+                sectionEn = "Household",
+                sectionBn = "গৃহস্থালি ও মুদি দোকান",
+                locationTipEn = "General store & FMCG wholesale counter",
+                locationTipBn = "মুদি দোকান বা ডিপার্টমেন্টাল স্টোরের সাবানের তাক",
+                buyingTipEn = "Look for value refill packs to save money",
+                buyingTipBn = "সাশ্রয়ী রিফিল প্যাক কিনলে খরচ কম হয়",
+                minPrice = 60.0,
+                maxPrice = 160.0,
+                priceUnit = "pack",
+                defaultUnit = "kg",
+                defaultQty = 1.0
+            )
+        )
     }
 }

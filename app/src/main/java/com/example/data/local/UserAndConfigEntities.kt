@@ -14,7 +14,7 @@ data class UserEntity(
     val preferredLanguage: String = "bn",
     val companionIdentifier: String? = null, // Companion phone or email (husband/wife)
     val companionRole: String = "SPOUSE", // "HUSBAND", "WIFE", "PARTNER"
-    val currencySymbol: String = "৳", // BDT ৳, INR ₹, USD $, EUR €, etc.
+    val currencySymbol: String = "₹", // INR ₹, USD $, EUR €, etc.
     val preferredUnitSystem: String = "METRIC", // METRIC, IMPERIAL
     val backupFrequency: String = "DAILY", // OFF, DAILY, WEEKLY, MONTHLY
     val lastBackupTime: Long = 0L,

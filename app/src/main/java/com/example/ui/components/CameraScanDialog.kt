@@ -87,6 +87,7 @@ import java.io.File
 @Composable
 fun CameraScanDialog(
     language: AppLanguage,
+    currencySymbol: String = "₹",
     onDismiss: () -> Unit,
     onItemsExtractedAndConfirmed: (List<ScannedItemResult>, File?) -> Unit
 ) {
@@ -510,7 +511,7 @@ fun CameraScanDialog(
                                             }
 
                                             Text(
-                                                text = "${item.quantity} ${item.unit}" + (if (item.estimatedPrice > 0) " • ≈ ৳${item.estimatedPrice.toInt()}" else "") + (if (item.notes.isNotBlank()) " • ${item.notes}" else ""),
+                                                text = "${item.quantity} ${item.unit}" + (if (item.estimatedPrice > 0) " • ≈ $currencySymbol${item.estimatedPrice.toInt()}" else "") + (if (item.notes.isNotBlank()) " • ${item.notes}" else ""),
                                                 fontSize = 11.sp,
                                                 color = MaterialTheme.colorScheme.outline
                                             )
@@ -650,7 +651,7 @@ fun CameraScanDialog(
                     OutlinedTextField(
                         value = editPrice,
                         onValueChange = { editPrice = it },
-                        label = { Text(if (isBn) "আনুমানিক মূল্য (৳)" else "Est Price (৳)") },
+                        label = { Text(if (isBn) "আনুমানিক মূল্য ($currencySymbol)" else "Est Price ($currencySymbol)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()

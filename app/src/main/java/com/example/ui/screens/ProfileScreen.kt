@@ -90,7 +90,7 @@ fun ProfileScreen(
     var editIdentifier by remember(currentUser) { mutableStateOf(currentUser?.identifier ?: "") }
     var editCompanionId by remember(currentUser) { mutableStateOf(currentUser?.companionIdentifier ?: "") }
     var editCompanionRole by remember(currentUser) { mutableStateOf(currentUser?.companionRole ?: "WIFE") }
-    var editCurrency by remember(currentUser) { mutableStateOf(currentUser?.currencySymbol ?: "৳") }
+    var editCurrency by remember(currentUser) { mutableStateOf(currentUser?.currencySymbol ?: "₹") }
     var editUnitSystem by remember(currentUser) { mutableStateOf(currentUser?.preferredUnitSystem ?: "METRIC") }
     var editBackupFreq by remember(currentUser) { mutableStateOf(currentUser?.backupFrequency ?: "DAILY") }
 
@@ -98,8 +98,8 @@ fun ProfileScreen(
     var showDeactivateDialog by remember { mutableStateOf(false) }
 
     val currencyList = listOf(
-        Pair("৳", "BDT (৳) - Bangladesh"),
         Pair("₹", "INR (₹) - India"),
+        Pair("৳", "BDT (৳) - Bangladesh"),
         Pair("$", "USD ($) - United States"),
         Pair("€", "EUR (€) - Europe"),
         Pair("£", "GBP (£) - UK"),
@@ -177,7 +177,7 @@ fun ProfileScreen(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = "Currency: ${currentUser?.currencySymbol ?: "৳"}",
+                                text = "Currency: ${currentUser?.currencySymbol ?: "₹"}",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -380,7 +380,7 @@ fun ProfileScreen(
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
                         )
-                        Text(text = "Currency: ${currentUser?.currencySymbol ?: "৳"} • Schedule: ${currentUser?.backupFrequency ?: "DAILY"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                        Text(text = "Currency: ${currentUser?.currencySymbol ?: "₹"} • Schedule: ${currentUser?.backupFrequency ?: "DAILY"}", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
                     }
 
                     if (saveFeedback != null) {
